@@ -17,8 +17,6 @@ class TelemetryIn(BaseModel):
     cooling_water_outlet_c: float = Field(ge=-20, le=200)
     vibration_bearing_4_mm_s: float = Field(ge=0, le=100)
     scavenge_air_pressure_bar: float = Field(ge=0, le=20)
-    failure_within_72h: bool | None = Field(default=None, description="Training label only")
-
     @field_validator("recorded_at")
     @classmethod
     def must_have_timezone(cls, value: datetime) -> datetime:
@@ -45,10 +43,3 @@ class PredictionOut(BaseModel):
 class IngestResponse(BaseModel):
     telemetry_id: int
     prediction: PredictionOut
-
-
-class TrainResponse(BaseModel):
-    model_version: str
-    samples: int
-    positive_samples: int
-    training_accuracy: float

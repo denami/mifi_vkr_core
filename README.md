@@ -1,6 +1,6 @@
 # Engine monitoring core
 
-FastAPI service for receiving engine telemetry, storing it, training a condition model and providing current dashboard data.
+FastAPI service for receiving engine telemetry, storing it, applying a pre-trained condition model and providing current dashboard data.
 
 ## Docker
 
@@ -10,13 +10,13 @@ From the `core` directory, build and start the service with a persistent volume 
 docker compose up --build -d
 ```
 
-The API will be reachable at `http://127.0.0.1:8000`. The image is named `vks-engine-core:latest`; stop it with `docker compose down`. The named `core_data` volume is preserved after stopping the container, so historical telemetry and the trained model are not lost.
+The API will be reachable at `http://127.0.0.1:8000`. The image is named `vks-engine-core:latest`; stop it with `docker compose down`. The named `core_data` volume preserves telemetry. Before starting the container, create `../model/artifacts/condition_model.joblib` using the separate [model training script](../model/README.md). It is mounted read-only into the runtime container at `/models/condition_model.joblib`.
 
 To build without Compose:
 
 ```powershell
 docker build -t vks-engine-core:latest .
-docker run --rm -p 8000:8000 -v vks-core-data:/data vks-engine-core:latest
+docker run --rm -p 8000:8000 -v vks-core-data:/data -v ..\model\artifacts:/models:ro vks-engine-core:latest
 ```
 
 Set `SOURCE_API_URL` and `SOURCE_API_TOKEN` in the shell or in a Compose `.env` file before starting the service when it needs to synchronise with an external telemetry provider.
@@ -41,11 +41,10 @@ SQLite is used by default and the database file is created automatically. Copy `
 | `POST` | `/api/v1/telemetry` | Accept one current telemetry measurement |
 | `POST` | `/api/v1/telemetry/batch` | Accept several measurements |
 | `POST` | `/api/v1/sync` | Fetch measurements from `SOURCE_API_URL` |
-| `POST` | `/api/v1/model/train` | Train the failure-risk model on labelled data |
 | `GET` | `/api/v1/dashboard/current` | Current data, prediction and recommendations for the dashboard |
 | `GET` | `/api/v1/telemetry/history` | Recent persisted measurements |
 
-The `failure_within_72h` label is required only for historical data used for training: `true` means a fault happened within the next 72 hours, `false` means it did not. The service will return `model_not_trained` predictions until it has at least 20 labelled examples with both label classes. This is intentional: an untrained model must not present a fake maintenance forecast.
+The runtime service never trains models and exposes no training endpoint. If the configured model file is absent, it returns `model_not_trained`; this is intentional, because it must not present a fake maintenance forecast. Train and validate an artefact outside the final device using the [model training project](../model/README.md), then deploy the resulting `.joblib` file.
 
 ## Example telemetry request
 
@@ -68,9 +67,9 @@ Invoke-RestMethod -Method Post -ContentType 'application/json' -Uri http://127.0
 
 ## Model lifecycle
 
-1. Import historical labelled measurements through the regular telemetry endpoint.
-2. Train a `RandomForestClassifier` with `POST /api/v1/model/train`.
-3. Every incoming measurement is scored automatically and its prediction is stored in the database.
-4. Retrain periodically as new labelled maintenance outcomes become available.
+1. Train and validate a model in the separate `model` directory.
+2. Copy the approved `.joblib` artefact to the configured `MODEL_PATH`.
+3. Start or restart Core; it loads the artefact once at startup.
+4. Every incoming measurement is scored and its prediction is stored in the database.
 
 Use a dataset reviewed by marine-engineering experts before relying on a prediction for maintenance decisions.

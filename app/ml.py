@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sqlalchemy import select
-from sqlalchemy.orm import Session
 
 from .config import MODEL_PATH
 from .models import Telemetry
@@ -32,11 +29,11 @@ class Score:
 
 
 class ConditionModel:
-    """Persists a supervised failure-risk model and scores incoming telemetry."""
+    """Loads a pre-trained failure-risk model and scores incoming telemetry."""
 
     def __init__(self, model_path: Path = MODEL_PATH):
         self.model_path = model_path
-        self.model: RandomForestClassifier | None = None
+        self.model: Any | None = None
         self.version: str | None = None
         self.load()
 
@@ -48,30 +45,10 @@ class ConditionModel:
         if not self.model_path.exists():
             return
         saved = joblib.load(self.model_path)
+        if tuple(saved.get("features", ())) != FEATURES:
+            raise ValueError(f"Model at {self.model_path} has an incompatible feature schema.")
         self.model = saved["model"]
         self.version = saved["version"]
-
-    def train(self, session: Session) -> tuple[str, int, int, float]:
-        rows = session.scalars(
-            select(Telemetry).where(Telemetry.failure_within_72h.is_not(None))
-        ).all()
-        if len(rows) < 20:
-            raise ValueError("Need at least 20 labelled measurements before training.")
-        labels = np.array([row.failure_within_72h for row in rows], dtype=int)
-        if len(np.unique(labels)) < 2:
-            raise ValueError("Training data must include both normal and failure examples.")
-        matrix = np.array([[getattr(row, feature) for feature in FEATURES] for row in rows])
-        model = RandomForestClassifier(
-            n_estimators=300, max_depth=10, min_samples_leaf=2,
-            class_weight="balanced", random_state=42, n_jobs=-1,
-        )
-        model.fit(matrix, labels)
-        accuracy = float(model.score(matrix, labels))
-        version = "rf-" + datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-        self.model_path.parent.mkdir(parents=True, exist_ok=True)
-        joblib.dump({"model": model, "version": version, "features": FEATURES}, self.model_path)
-        self.model, self.version = model, version
-        return version, len(rows), int(labels.sum()), accuracy
 
     def score(self, telemetry: Telemetry) -> Score | None:
         if not self.model:

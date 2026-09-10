@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     DATABASE_URL=sqlite:////data/engine_monitor.db \
-    MODEL_PATH=/data/artifacts/condition_model.joblib
+    MODEL_PATH=/models/condition_model.joblib
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
-RUN mkdir -p /data/artifacts && chown -R appuser:appuser /app /data
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
 
 USER appuser
 VOLUME ["/data"]

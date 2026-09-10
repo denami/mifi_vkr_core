@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -24,8 +24,6 @@ class Telemetry(Base):
     cooling_water_outlet_c: Mapped[float] = mapped_column(Float)
     vibration_bearing_4_mm_s: Mapped[float] = mapped_column(Float)
     scavenge_air_pressure_bar: Mapped[float] = mapped_column(Float)
-    failure_within_72h: Mapped[bool | None] = mapped_column(Boolean, nullable=True, index=True)
-
     prediction: Mapped["Prediction | None"] = relationship(back_populates="telemetry", uselist=False, cascade="all, delete-orphan")
 
 

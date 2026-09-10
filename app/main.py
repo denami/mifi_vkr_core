@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Any
 
 import httpx
@@ -14,7 +13,7 @@ from .config import SOURCE_API_TOKEN, SOURCE_API_URL
 from .database import Base, engine, get_session
 from .ml import ConditionModel
 from .models import Telemetry
-from .schemas import BatchTelemetryIn, IngestResponse, TelemetryIn, TrainResponse
+from .schemas import BatchTelemetryIn, IngestResponse, TelemetryIn
 from .services import create_prediction, create_telemetry, latest_record, prediction_payload, recommendations
 
 condition_model = ConditionModel()
@@ -77,15 +76,6 @@ async def sync_from_source(session: Session = Depends(get_session)) -> dict[str,
     validated = [TelemetryIn.model_validate(item) for item in records]
     output = [ingest(session, item) for item in validated]
     return {"received": len(output), "telemetry_ids": [item.telemetry_id for item in output]}
-
-
-@app.post("/api/v1/model/train", response_model=TrainResponse)
-def train_model(session: Session = Depends(get_session)) -> TrainResponse:
-    try:
-        version, samples, positives, accuracy = condition_model.train(session)
-    except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
-    return TrainResponse(model_version=version, samples=samples, positive_samples=positives, training_accuracy=round(accuracy, 3))
 
 
 @app.get("/api/v1/dashboard/current")
