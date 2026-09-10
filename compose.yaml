@@ -1,0 +1,22 @@
+services:
+  core:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: vks-engine-core:latest
+    container_name: vks-engine-core
+    ports:
+      - "8000:8000"
+    environment:
+      # Persistent locations inside the named Docker volume.
+      DATABASE_URL: sqlite:////data/engine_monitor.db
+      MODEL_PATH: /data/artifacts/condition_model.joblib
+      # Set these when synchronising from a real source API.
+      SOURCE_API_URL: ${SOURCE_API_URL:-}
+      SOURCE_API_TOKEN: ${SOURCE_API_TOKEN:-}
+    volumes:
+      - core_data:/data
+    restart: unless-stopped
+
+volumes:
+  core_data:

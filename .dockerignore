@@ -1,0 +1,9 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__/
+*.py[cod]
+engine_monitor.db
+artifacts/
+README.md
